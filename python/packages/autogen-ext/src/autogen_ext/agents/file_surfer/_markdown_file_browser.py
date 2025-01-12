@@ -1,4 +1,3 @@
-# ruff: noqa: E722
 import datetime
 import io
 import os
@@ -6,8 +5,7 @@ import re
 import time
 from typing import List, Optional, Tuple, Union
 
-# TODO: Fix unfollowed import
-from markitdown import FileConversionException, MarkItDown, UnsupportedFormatException  # type: ignore
+from markitdown import FileConversionException, MarkItDown, UnsupportedFormatException  # Ensure the `markitdown` module is correctly installed and accessible. The `# type: ignore` suggests potential type-checking issues that might need resolution.
 
 
 class MarkdownFileBrowser:
@@ -15,8 +13,7 @@ class MarkdownFileBrowser:
     (In preview) An extremely simple Markdown-powered file browser.
     """
 
-    # TODO: Fix unfollowed import
-    def __init__(  # type: ignore
+    def __init__(
         self, viewport_size: Union[int, None] = 1024 * 8
     ):
         """
@@ -25,7 +22,7 @@ class MarkdownFileBrowser:
         Arguments:
             viewport_size: Approximately how many *characters* fit in the viewport. Viewport dimensions are adjusted dynamically to avoid cutting off words (default: 8192).
         """
-        self.viewport_size = viewport_size  # Applies only to the standard uri types
+        self.viewport_size = viewport_size  # Applies only to the standard uri types #Consider verifying the viewport size to ensure it aligns with the intended display area.
         self.history: List[Tuple[str, float]] = list()
         self.page_title: Optional[str] = None
         self.viewport_current_page = 0
@@ -33,7 +30,7 @@ class MarkdownFileBrowser:
         self._markdown_converter = MarkItDown()
         self.set_path(os.getcwd())
         self._page_content: str = ""
-        self._find_on_page_query: Union[str, None] = None
+        self._find_on_page_query: Union[str, None] = None #The find_on_page_query property is accessed in set_path, but it’s not explicitly defined. Consider defining or properly initializing it to avoid potential AttributeError.
         self._find_on_page_last_result: Union[int, None] = None  # Location of the last result
 
     @property
@@ -49,7 +46,7 @@ class MarkdownFileBrowser:
         This will result in the file being opened for reading.
 
         Arguments:
-            path: An absolute or relative path of the file or directory to open."
+            path: An absolute or relative path of the file or directory to open.
         """
 
         # Handle relative paths
@@ -59,19 +56,18 @@ class MarkdownFileBrowser:
                 path = os.path.abspath(os.path.join(os.path.dirname(self.path), path))
             elif os.path.isdir(self.path):
                 path = os.path.abspath(os.path.join(self.path, path))
-            # If neither a file or a directory, take it verbatim
 
         self.history.append((path, time.time()))
         self._open_path(path)
         self.viewport_current_page = 0
-        self.find_on_page_query = None
-        self.find_on_page_viewport = None
+        self._find_on_page_query = None
+        self._find_on_page_last_result = None
 
     @property
     def viewport(self) -> str:
         """Return the content of the current viewport."""
         bounds = self.viewport_pages[self.viewport_current_page]
-        return self.page_content[bounds[0] : bounds[1]]
+        return self.page_content[bounds[0]:bounds[1]]
 
     @property
     def page_content(self) -> str:
@@ -101,12 +97,9 @@ class MarkdownFileBrowser:
     def find_on_page(self, query: str) -> Union[str, None]:
         """Searches for the query from the current viewport forward, looping back to the start if necessary."""
 
-        # Did we get here via a previous find_on_page search with the same query?
-        # If so, map to find_next
         if query == self._find_on_page_query and self.viewport_current_page == self._find_on_page_last_result:
             return self.find_next()
 
-        # Ok it's a new search start from the current viewport
         self._find_on_page_query = query
         viewport_match = self._find_next_viewport(query, self.viewport_current_page)
         if viewport_match is None:
@@ -146,10 +139,9 @@ class MarkdownFileBrowser:
         if query is None:
             return None
 
-        # Normalize the query, and convert to a regular expression
-        nquery = re.sub(r"\*", "__STAR__", query)
-        nquery = " " + (" ".join(re.split(r"\W+", nquery))).strip() + " "
-        nquery = nquery.replace(" __STAR__ ", "__STAR__ ")  # Merge isolated stars with prior word
+        nquery = re.sub(r"\\*", "__STAR__", query)
+        nquery = " " + (" ".join(re.split(r"\\W+", nquery))).strip() + " "
+        nquery = nquery.replace(" __STAR__ ", "__STAR__ ")
         nquery = nquery.replace("__STAR__", ".*").lower()
 
         if nquery.strip() == "":
@@ -161,10 +153,9 @@ class MarkdownFileBrowser:
 
         for i in idxs:
             bounds = self.viewport_pages[i]
-            content = self.page_content[bounds[0] : bounds[1]]
+            content = self.page_content[bounds[0]:bounds[1]]
 
-            # TODO: Remove markdown links and images
-            ncontent = " " + (" ".join(re.split(r"\W+", content))).strip().lower() + " "
+            ncontent = " " + (" ".join(re.split(r"\\W+", content))).strip().lower() + " "
             if re.search(nquery, ncontent):
                 return i
 
@@ -177,34 +168,24 @@ class MarkdownFileBrowser:
 
     def _split_pages(self) -> None:
         """Split the page contents into pages that are approximately the viewport size. Small deviations are permitted to ensure words are not broken."""
-        # Handle empty pages
         if len(self._page_content) == 0:
             self.viewport_pages = [(0, 0)]
             return
 
-        # Break the viewport into pages
         self.viewport_pages = []
         start_idx = 0
         while start_idx < len(self._page_content):
-            end_idx = min(start_idx + self.viewport_size, len(self._page_content))  # type: ignore[operator]
-            # Adjust to end on a space
+            end_idx = min(start_idx + self.viewport_size, len(self._page_content))
             while end_idx < len(self._page_content) and self._page_content[end_idx - 1] not in [" ", "\t", "\r", "\n"]:
                 end_idx += 1
             self.viewport_pages.append((start_idx, end_idx))
             start_idx = end_idx
 
-    def _open_path(
-        self,
-        path: str,
-    ) -> None:
-        """Open a file for reading, converting it to Markdown in the process.
-
-        Arguments:
-            path: The path of the file or directory to open.
-        """
+    def _open_path(self, path: str) -> None:
+        """Open a file for reading, converting it to Markdown in the process."""
         try:
-            if os.path.isdir(path):  # TODO: Fix markdown_converter types
-                res = self._markdown_converter.convert_stream(  # type: ignore
+            if os.path.isdir(path):
+                res = self._markdown_converter.convert_stream(
                     io.StringIO(self._fetch_local_dir(path)), file_extension=".txt"
                 )
                 self.page_title = res.title
@@ -224,15 +205,7 @@ class MarkdownFileBrowser:
             self._set_page_content(f"# File not found: {path}")
 
     def _fetch_local_dir(self, local_path: str) -> str:
-        """Render a local directory listing in HTML to assist with local file browsing via the "file://" protocol.
-        Through rendered in HTML, later parts of the pipeline will convert the listing to Markdown.
-
-        Arguments:
-            local_path: A path to the local directory whose contents are to be listed.
-
-        Returns:
-            A directory listing, rendered in HTML.
-        """
+        """Render a local directory listing in HTML to assist with local file browsing via the "file://" protocol."""
         listing = f"""
 # Index of {local_path}
 
@@ -252,3 +225,4 @@ class MarkdownFileBrowser:
 
             listing += f"| {entry} | {size} | {mtime} |\n"
         return listing
+
